@@ -1,0 +1,54 @@
+name: RTA Booking Scraper
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"  # Runs every 6 hours
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y jq parallel chromium-chromedriver
+        pip install selenium
+
+    - name: Create settings.json
+      run: |
+        cat <<EOF > settings.json
+        {
+          "username": "${{ secrets.RTA_USERNAME }}",
+          "password": "${{ secrets.RTA_PASSWORD }}",
+          "have_booking": false,
+          "headless": true,
+          "wait_timer": 3,
+          "wait_timer_car": 5,
+          "git_upload": false
+        }
+        EOF
+
+    - name: Make script executable
+      run: chmod +x get_all_locations.sh
+
+    - name: Run scraper
+      run: ./get_all_locations.sh
+
+    - name: Commit results
+      run: |
+        cd docs
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add results.json update-time.txt || true
+        git commit -m "Update RTA availability [skip ci]" || echo "No changes to commit"
+        git push
